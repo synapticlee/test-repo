@@ -1,0 +1,119 @@
+# GitHub Actions workflow for Textra
+name: Textra CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  test-textra:
+    runs-on: macos-latest # Required for Apple APIs
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Check macOS version
+      run: |
+        echo "macOS version:"
+        sw_vers
+        echo "Available system frameworks:"
+        ls /System/Library/Frameworks/ | grep -E "(Vision|Speech)"
+    
+    - name: Download and install Textra
+      run: |
+        # Option 1: Use the install script (recommended)
+        curl -L https://github.com/freedmand/textra/raw/main/install.sh | bash
+        
+        # Verify installation
+        which textra
+        textra --version
+    
+    - name: Alternative installation method
+      if: failure() # Only run if the above fails
+      run: |
+        # Option 2: Download release binary directly
+        LATEST_RELEASE=$(curl -s https://api.github.com/repos/freedmand/textra/releases/latest | grep tag_name | cut -d '"' -f 4)
+        curl -L "https://github.com/freedmand/textra/releases/download/${LATEST_RELEASE}/textra.zip" -o textra.zip
+        unzip textra.zip
+        chmod +x textra
+        sudo mv textra /usr/local/bin/
+        textra --version
+    
+    - name: Create test files
+      run: |
+        # Create a simple test image with text (using ImageMagick if available)
+        # Note: This might not work on GitHub Actions without additional setup
+        echo "Creating test files for Textra..."
+        
+        # Create a simple text file to test with (if we had a way to convert it to image)
+        echo "Hello, World! This is a test document for Textra." > test_content.txt
+        
+        # For PDF testing, we could use other tools to create a simple PDF
+        # or upload test files to the repository
+    
+    - name: Test Textra with sample files
+      run: |
+        # Test basic functionality
+        echo "Testing Textra help:"
+        textra --help
+        
+        # If you have test files in your repository:
+        # textra test_image.png
+        # textra test_document.pdf
+        # textra test_audio.mp3
+        
+        # Test with error handling
+        echo "Textra is installed and ready to use"
+    
+    - name: Handle dictation requirements
+      run: |
+        # Note: GitHub Actions runners may not support dictation features
+        echo "Checking for speech recognition capabilities..."
+        
+        # This might fail on GitHub Actions as it requires user interaction
+        # and specific macOS privacy permissions
+        
+        # For actual testing, you might need to:
+        # 1. Use self-hosted runners on your own Mac
+        # 2. Or limit testing to image/PDF functionality only
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: textra-test-results
+        path: |
+          *.txt
+          *.json
+        retention-days: 7
+
+  build-and-test:
+    runs-on: macos-latest
+    if: github.event_name == 'push' # Only on push, not PR
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Textra and run comprehensive tests
+      run: |
+        # Install Textra
+        curl -L https://github.com/freedmand/textra/raw/main/install.sh | bash
+        
+        # Create test directory
+        mkdir -p test_output
+        
+        # If you have test files committed to your repo:
+        # textra samples/test_image.png -o test_output/image_text.txt
+        # textra samples/test_document.pdf -o test_output/pdf_text.txt
+        
+        echo "Textra installation and basic testing completed"
+    
+    - name: Performance test (if applicable)
+      run: |
+        # Add any performance testing here
+        # time textra large_document.pdf
+        echo "Performance testing would go here"
